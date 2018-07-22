@@ -1,0 +1,254 @@
+
+<!DOCTYPE html><html lang='en' class=''>
+  <head>
+    <link rel='stylesheet prefetch' href='https://www.w3schools.com/lib/w3.css'>
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+  </head>
+<body>
+<div ng-app="myApp" ng-controller="myCtrl" class="w3-card-2 w3-margin" style="max-width:400px;">
+
+  <div class="w3-container w3-light-grey w3-padding-16" style="position:fixed; z-index:99; border-radius: 4px; background-color: rgba(0,0,0,.4) !important; border: 1px solid rgba(255,255,255,.4); color: rgba(255,255,255,.7) !important;">
+    <p class="w3-padding-left">Lt:{{latitude}}</p>
+    <p class="w3-padding-left">Lg:{{longitude}}</p>
+    <p class="w3-padding-left">Temp:{{weatherData}} {{celcFar}}   <img src="http://openweathermap.org/img/w/{{iconWeather}}.png"/></p>
+    <button ng-click="changeUnits()" class="w3-btn w3-padding w3-green">Celsius/Fahrenheit</button>
+  </div>
+
+  <div id="map_canvas" style="position:absolute; top:0; left:0px; height:100%; width:100%;overflow:hidden;"></div>
+
+  </div>
+
+<script src='http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.14/angular.min.js'></script>
+<script >var app = angular.module("myApp", []); 
+
+app.controller("myCtrl", function($scope, GeoLocation) {
+  $scope.celcFar="C";
+  $scope.iconWeather="01d";
+  $scope.changeUnits =function () {
+    if ($scope.celcFar=="C")
+      $scope.celcFar="F";
+    else
+      $scope.celcFar="C";
+    init();
+  }
+
+
+  var init = function(){
+    GeoLocation.location(function (geoposition) {
+          var distanceLimit = 50; // m´2
+    var numberRandomPoints = 6;
+    var mapZoomLevel = 17;
+    var locationindex = 0;
+    var locations = [  ];
+      $scope.latitude = geoposition.coords.latitude;
+      $scope.longitude = geoposition.coords.longitude;
+         var lat = geoposition.coords.latitude,
+   lon = geoposition.coords.longitude,
+   ubicacion = {};
+   ubicacion.name = "Yo";
+   ubicacion.latitude = lat;
+   ubicacion.longitude = lon;
+   locations.push(ubicacion); 
+          console.log(locations);
+var markers = [];
+var currentcircle;
+
+//Create the default map
+var mapcenter = new google.maps.LatLng(locations[locationindex].latitude, locations[locationindex].longitude);
+var myOptions = {
+    zoom: mapZoomLevel,
+    scaleControl: true,
+    center: mapcenter
+};
+var map = new google.maps.Map(document.getElementById('map_canvas'), myOptions);
+
+//Draw default items
+var centermarker = addCenterMarker(mapcenter, locations[locationindex].name + '<br>' + locations[locationindex].latitude + ', ' + locations[locationindex].longitude);
+var mappoints = generateMapPoints(locations[locationindex], distanceLimit, numberRandomPoints);
+drawRadiusCircle(map, centermarker, distanceLimit);
+createRandomMapMarkers(map, mappoints);
+
+//Create random lat/long coordinates in a specified radius around a center point
+function randomGeo(center, radius) {
+    var y0 = center.latitude;
+    var x0 = center.longitude;
+    var rd = radius / 111300; //about 111300 meters in one degree
+
+    var u = Math.random();
+    var v = Math.random();
+
+    var w = rd * Math.sqrt(u);
+    var t = 2 * Math.PI * v;
+    var x = w * Math.cos(t);
+    var y = w * Math.sin(t);
+
+    //Adjust the x-coordinate for the shrinking of the east-west distances
+    var xp = x / Math.cos(y0);
+
+    var newlat = y + y0;
+    var newlon = x + x0;
+    var newlon2 = xp + x0;
+
+    return {
+        'latitude': newlat.toFixed(5),
+        'longitude': newlon.toFixed(5),
+        'longitude2': newlon2.toFixed(5),
+        'distance': distance(center.latitude, center.longitude, newlat, newlon).toFixed(2),
+        'distance2': distance(center.latitude, center.longitude, newlat, newlon2).toFixed(2),
+    };
+}
+
+//Calc the distance between 2 coordinates as the crow flies
+function distance(lat1, lon1, lat2, lon2) {
+    var R = 500000;
+    var a = 0.5 - Math.cos((lat2 - lat1) * Math.PI / 180) / 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (1 - Math.cos((lon2 - lon1) * Math.PI / 180)) / 2;
+    return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+//Generate a number of mappoints
+function generateMapPoints(centerpoint, distance, amount) {
+    var mappoints = [];
+    for (var i=0; i<amount; i++) {
+        mappoints.push(randomGeo(centerpoint, distance));
+    }
+    return mappoints;
+}
+
+//Add a unique center marker
+function addCenterMarker(centerposition, title) {
+    
+    var infowindow = new google.maps.InfoWindow({
+        content: title
+    });
+    
+    var newmarker = new google.maps.Marker({
+        icon: 'http://google.com/mapfiles/ms/micons/ylw-pushpin.png',
+        position: mapcenter,
+        map: map,
+        title: title,
+        zIndex: 3
+    });
+    
+    google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
+        infowindow.open(map,newmarker);
+    });
+    
+    markers.push(newmarker);
+    return newmarker;
+}
+
+//Draw a circle on the map
+function drawRadiusCircle (map, marker, distance) {
+    currentcircle = new google.maps.Circle({
+        map: map,
+        radius: distance
+    });
+    currentcircle.bindTo('center', marker, 'position');
+}
+
+//Create markers for the randomly generated points
+function createRandomMapMarkers(map, mappoints) {
+
+  var http = $.ajax({
+    url: 'https://mqserv.com:9073/pokemons',
+    dataType: "json"        //This is what makes jQuery parse the data in the expected format
+});
+
+http.done(function(data){
+    // data is already parsed as JSON
+    console.log(data);
+
+        for(var i=0;i<data.length;i++ ){
+            console.log(data[i].doc.pok);
+        
+
+
+    for (var i = 0; i < mappoints.length; i++) {
+        //Map points without the east/west adjustment
+        var newmappoint = new google.maps.LatLng(mappoints[i].latitude, mappoints[i].longitude);
+        var marker = new google.maps.Marker({
+            position:newmappoint,
+            map: map,
+            title: mappoints[i].latitude + ', ' + mappoints[i].longitude + ' | ' + mappoints[i].distance + 'm',
+            zIndex: 2
+        });
+        markers.push(marker);
+
+        //Map points with the east/west adjustment
+        var newmappoint = new google.maps.LatLng(mappoints[i].latitude, mappoints[i].longitude2);
+        var marker = new google.maps.Marker({
+            icon: data[i].doc.img,
+            position:newmappoint,
+            map: map,
+            title: mappoints[i].latitude + ', ' + mappoints[i].longitude2 + ' | ' + mappoints[i].distance2 + 'm',
+            zIndex: 99
+        });
+        markers.push(marker);
+    }
+    }
+    });
+}
+
+//Destroy all markers
+function clearMarkers() {
+    for (var i = 0; i < markers.length; i++) {
+        markers[i].setMap(null);
+    }
+    markers = [];
+}
+
+
+      GeoLocation.weatherData($scope.latitude,$scope.longitude,$scope.celcFar).success(function(data) {
+        $scope.weatherData = Math.round(data.main.temp);
+        $scope.iconWeather = data.weather[0].icon;
+      });
+
+      $scope.$apply();
+    });
+  };
+  
+  init();
+});
+
+
+app.factory('GeoLocation', function($http) {
+   
+  function _getWeatherData(latitude,longitude,isCelsius)
+  {
+    var baseurl="http://api.openweathermap.org/data/2.5/weather?";
+    var coords="lat="+latitude+"&lon="+longitude;
+    var appid = "&APPID=b4d33d3b19cc156fceb7e38a3f52ab67";
+    if (isCelsius=="F")
+      var celcOrFar = "&units=imperial";
+    else 
+      var celcOrFar ="&units=metric";
+    return $http.jsonp(baseurl+coords+appid+"&callback=JSON_CALLBACK"+celcOrFar);
+  }
+  
+   function _onSuccess (callback, position) {
+     callback(position);
+   };
+
+   function _onError (callback, error) {
+     console.log(error)
+     callback();
+   };
+
+   function _getLocation (callback) {
+     navigator.geolocation.getCurrentPosition(
+       _onSuccess.bind(this,callback),
+       _onError.bind(this,callback) 
+     );
+   }
+
+  return {
+    location: _getLocation,
+    weatherData : _getWeatherData
+  }
+
+});
+
+//# sourceURL=keetup.js
+</script>
+</body></html>
